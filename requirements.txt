@@ -9,3 +9,5 @@ wolframalpha
 psutil
 pyautogui
 schedule
+webrtcvad
+aiohttp
