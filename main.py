@@ -1,42 +1,42 @@
-from modules.speech import Speech
-from modules.tasks import TaskManager
+import sys
 import time
-from config import Config
+import random
+sys.path.append('.')
 from modules.speech import Speech
 from modules.tasks import TaskManager
-
+from config import Config
 
 class FRIDAY:
     def __init__(self):
-        print("Initializing FRIDAY...")
         self.speech = Speech()
         self.tasks = TaskManager()
-        self.listening_for_command = False
+        self.startup_phrases = [
+            "Systems online. Ready to assist.",
+            "All systems operational.",
+            "Good day! FRIDAY at your service.",
+        ]
+        self.acknowledgments = [
+            "Yes?", "How can I help?", "I'm listening",
+            "At your service", "What can I do for you?"
+        ]
         
     def run(self):
-        print("FRIDAY is ready! Say 'Friday' to start.")
+        startup_msg = random.choice(self.startup_phrases)
+        self.speech.speak(startup_msg)
         
         while True:
             try:
                 text = self.speech.listen_and_transcribe()
-                if not text:
-                    continue
-                    
-                if Config.WAKE_WORD in text and not self.listening_for_command:
-                    self.speech.speak("Yes?")
-                    self.listening_for_command = True
-                    continue
-                    
-                if self.listening_for_command:
-                    response = self.tasks.execute_command(text)
+                if Config.WAKE_WORD in text.lower():
+                    self.speech.speak(random.choice(self.acknowledgments))
+                    command = self.speech.listen_and_transcribe()
+                    response = self.tasks.execute_command(command)
                     self.speech.speak(response)
-                    self.listening_for_command = False
-                    
             except KeyboardInterrupt:
+                self.speech.speak("Shutting down. Goodbye!")
                 break
             except Exception as e:
                 print(f"Error: {e}")
-                self.listening_for_command = False
 
 if __name__ == "__main__":
     friday = FRIDAY()
