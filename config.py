@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+import pyaudio
 
 load_dotenv()
 
@@ -12,3 +13,4 @@ class Config:
     CHANNELS = 1
     RECORD_SECONDS = 3
     WAKE_WORD = "friday"
+    VOICE_ID = "com.apple.speech.synthesis.voice.karen" 

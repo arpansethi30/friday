@@ -11,3 +11,4 @@ pyautogui
 schedule
 webrtcvad
 aiohttp
+psutil

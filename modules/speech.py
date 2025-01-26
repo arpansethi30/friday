@@ -10,21 +10,20 @@ from config import Config
 class Speech:
     def __init__(self):
         self.model = whisper.load_model(Config.WHISPER_MODEL)
-        self.setup_tts()
+        self.engine = pyttsx3.init()
         self.p = pyaudio.PyAudio()
         
-    def setup_tts(self):
-        """Initialize text-to-speech with specific settings"""
-        self.engine = pyttsx3.init()
-        voices = self.engine.getProperty('voices')
-        # Use default voice
-        self.engine.setProperty('voice', voices[0].id)
-        # These specific values worked well before
-        self.engine.setProperty('rate', 175)  # Original working speed
-        self.engine.setProperty('volume', 0.9) # Original working volume
+        # Voice settings for macOS Samantha voice
+        if sys.platform == 'darwin':  # Check if on macOS
+            self.engine.setProperty('voice', 'com.apple.speech.synthesis.voice.samantha')
+        else:
+            voices = self.engine.getProperty('voices')
+            self.engine.setProperty('voice', voices[1].id if len(voices) > 1 else voices[0].id)
+            
+        self.engine.setProperty('rate', 175)
+        self.engine.setProperty('volume', 0.9)
         
     def listen_and_transcribe(self):
-        # Create fresh stream each time
         stream = self.p.open(
             format=pyaudio.paInt16,
             channels=1,
@@ -42,14 +41,14 @@ class Speech:
         stream.stop_stream()
         stream.close()
         
-        audio = np.frombuffer(b''.join(frames), dtype=np.int16).astype(np.float32) / 32768.0
-        result = self.model.transcribe(audio)
+        audio_data = np.frombuffer(b''.join(frames), dtype=np.int16)
+        float_data = audio_data.astype(np.float32) / 32768.0
+        result = self.model.transcribe(float_data)
         text = result["text"].strip().lower()
         print(f"Heard: {text}")
         return text
         
     def speak(self, text):
-        """Simple, reliable speak method"""
         print(f"FRIDAY: {text}")
         self.engine.say(text)
         self.engine.runAndWait()
