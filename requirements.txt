@@ -1,0 +1,11 @@
+openai-whisper
+sounddevice
+numpy
+requests
+python-dotenv
+PyAudio
+pyttsx3
+wolframalpha
+psutil
+pyautogui
+schedule
