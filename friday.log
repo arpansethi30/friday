@@ -1,0 +1,10 @@
+2025-01-28 16:25:37,454 - FRIDAY - INFO - FRIDAY initialized successfully
+2025-01-28 16:34:34,216 - FRIDAY - INFO - FRIDAY initialized successfully
+2025-01-28 17:15:51,309 - FRIDAY - INFO - FRIDAY initialized successfully
+2025-01-28 21:11:22,704 - FRIDAY - INFO - FRIDAY initialized successfully
+2025-01-28 21:11:43,280 - FRIDAY - INFO - FRIDAY initialized successfully
+2025-01-28 21:18:42,363 - FRIDAY - ERROR - Error during initialization: [E050] Can't find model 'en_core_web_sm'. It doesn't seem to be a Python package or a valid path to a data directory.
+2025-01-28 21:19:50,046 - FRIDAY - INFO - FRIDAY initialized successfully
+2025-01-28 21:22:31,787 - FRIDAY - INFO - FRIDAY initialized successfully
+2025-01-28 21:27:51,327 - FRIDAY - ERROR - Error during initialization: 'TaskManager' object has no attribute '_clear_desktop'
+2025-01-28 21:30:16,965 - FRIDAY - INFO - FRIDAY initialized successfully

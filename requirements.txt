@@ -12,3 +12,4 @@ schedule
 webrtcvad
 aiohttp
 psutil
+dataclasses
