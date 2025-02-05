@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple, Optional
 from datetime import datetime, timedelta
 import re
 from config import Config
+import time
 
 class Brain:
     def __init__(self, config: Config):
@@ -12,22 +13,19 @@ class Brain:
         self.current_context = {}
         self.conversation_history = []
         self.last_interaction_time = None
+        self.conversation_context = []
+        self.user_preferences = self._load_preferences()
+        self.learning_data = self._load_learning_data()
         
     def process_input(self, text: str) -> Tuple[str, Dict, float]:
         """
         Process user input to understand intent, entities, and context
         Returns: (intent, entities, confidence)
         """
-        doc = self.nlp(text)
-        
-        # Extract intent and entities
-        intent = self._determine_intent(doc)
-        entities = self._extract_entities(doc)
-        confidence = self._calculate_confidence(doc)
-        
-        # Update conversation context
+        context = self._get_relevant_context()
+        intent, entities, confidence = self._analyze_with_context(text, context)
         self._update_context(text, intent, entities)
-        
+        self._learn_from_interaction(text, intent, entities)
         return intent, entities, confidence
         
     def _determine_intent(self, doc) -> str:
@@ -100,35 +98,40 @@ class Brain:
         
     def _update_context(self, text: str, intent: str, entities: Dict):
         """Update conversation context with new information"""
-        current_time = datetime.now()
-        
-        # Check if we should start a new conversation
-        if (self.last_interaction_time is None or 
-            (current_time - self.last_interaction_time).seconds > self.config.CONVERSATION_EXPIRY):
-            self.current_context = {}
-            self.conversation_history = []
-            
-        # Update context
-        self.current_context.update({
-            "last_intent": intent,
-            "last_entities": entities,
-            "last_text": text,
-            "timestamp": current_time.isoformat()
+        self.conversation_context.append({
+            'text': text,
+            'intent': intent,
+            'entities': entities,
+            'timestamp': time.time()
         })
+        self._trim_context()
         
-        # Add to conversation history
-        self.conversation_history.append({
-            "text": text,
-            "intent": intent,
-            "entities": entities,
-            "timestamp": current_time.isoformat()
-        })
+    def _get_relevant_context(self) -> List[Dict]:
+        """Get relevant conversation context"""
+        return self.conversation_context[-5:]  # Last 5 exchanges
         
-        # Trim conversation history if needed
-        if len(self.conversation_history) > self.config.CONTEXT_MEMORY_SIZE:
-            self.conversation_history.pop(0)
-            
-        self.last_interaction_time = current_time
+    def _analyze_with_context(self, text: str, context: List[Dict]) -> Tuple[str, Dict, float]:
+        """Analyze input considering conversation context"""
+        # Implementation for context-aware analysis
+        pass
+        
+    def _learn_from_interaction(self, text: str, intent: str, entities: Dict):
+        """Learn from user interactions"""
+        # Update learning data based on interaction
+        self.learning_data.setdefault(intent, {}).setdefault('examples', []).append(text)
+        self._update_user_preferences(intent, entities)
+        self._save_learning_data()
+        
+    def create_custom_command(self, name: str, actions: List[Dict]) -> bool:
+        """Create custom voice command"""
+        if name and actions:
+            self.learning_data.setdefault('custom_commands', {})[name] = {
+                'actions': actions,
+                'created': time.time()
+            }
+            self._save_learning_data()
+            return True
+        return False
         
     def get_conversation_context(self) -> Dict:
         """Get current conversation context"""

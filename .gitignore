@@ -169,3 +169,57 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Personal Data
+~/.friday/personal_data/
+~/.friday/logs/
+personal_brain.db
+user_prefs.json
+memory.json
+.env
+config.local.json
+
+# Security
+*.key
+*.pem
+encryption_key.txt
+.secrets/
+
+# Logs
+*.log
+logs/
+command_history.txt
+conversation_logs/
+
+# Runtime data
+__pycache__/
+*.py[cod]
+.Python
+.env.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# User data and logs
+user_prefs.json
+memory.json
+*.log
+
+# Environment and credentials
+.env
+credentials.json
+
+# System monitoring data
+system_stats/
+usage_patterns/
+command_history/
+
+# Conversation history and embeddings
+conversations/
+embeddings/
+
+# Personal data directories
+user_data/
+personal/

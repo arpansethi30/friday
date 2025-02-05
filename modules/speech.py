@@ -15,6 +15,9 @@ class Speech:
         self.model = whisper.load_model(config.WHISPER_MODEL)
         self.engine = self._setup_tts_engine()
         self.audio = pyaudio.PyAudio()
+        self.active_language = config.DEFAULT_LANGUAGE
+        self.wake_words = config.WAKE_WORDS
+        self.offline_model = self._load_offline_model()
         
     def setup_logging(self):
         logging.basicConfig(
@@ -36,6 +39,40 @@ class Speech:
         engine.setProperty('rate', 175)
         engine.setProperty('volume', 0.9)
         return engine
+        
+    def _load_offline_model(self):
+        """Load offline speech recognition model"""
+        try:
+            import vosk
+            model = vosk.Model(self.config.OFFLINE_MODEL_PATH)
+            return model
+        except ImportError:
+            self.logger.warning("Vosk not installed, offline recognition disabled")
+            return None
+            
+    def set_language(self, language_code: str):
+        """Change active language"""
+        if language_code in self.config.SUPPORTED_LANGUAGES:
+            self.active_language = language_code
+            self.engine.setProperty('voice', 
+                self.config.LANGUAGE_VOICES.get(language_code, self.config.VOICE_ID))
+            return True
+        return False
+        
+    def detect_wake_word(self, audio_data: np.ndarray) -> Optional[str]:
+        """Detect if audio contains any wake words"""
+        if self.offline_model:
+            text = self._offline_transcribe(audio_data)
+            return next((word for word in self.wake_words 
+                        if word.lower() in text.lower()), None)
+        return None
+        
+    def _offline_transcribe(self, audio_data: np.ndarray) -> str:
+        """Perform offline transcription using Vosk"""
+        if self.offline_model:
+            # Implementation for offline transcription
+            pass
+        return ""
         
     def listen_and_transcribe(self, timeout: Optional[int] = None) -> str:
         try:

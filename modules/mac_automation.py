@@ -1,17 +1,19 @@
 import subprocess
 import os
+import asyncio
+import logging
+from typing import Dict, List, Any, Optional
+from datetime import datetime
 import applescript
 import pyautogui
 import json
-from datetime import datetime
-from typing import List, Dict, Optional
-import logging
 from config import Config
 
 class MacAutomation:
     def __init__(self, config: Config):
         self.config = config
         self.logger = logging.getLogger('MacAutomation')
+        self.current_workspace = None
         
     def execute_system_command(self, command: str) -> str:
         """Execute system command using osascript"""
@@ -183,17 +185,58 @@ class MacAutomation:
 
     def _setup_presentation_workspace(self, data: Dict) -> str:
         """Setup presentation workspace"""
-        # Open Keynote or PowerPoint
-        os.system("open -a Keynote")
-        self.manage_windows("maximize", "Keynote")
-        
-        # Close unnecessary apps
-        self._close_unnecessary_apps()
-        
-        # Enable Do Not Disturb
-        self.toggle_do_not_disturb(True)
-        
-        return "Presentation workspace setup complete"
+        try:
+            # Close distracting applications
+            self._close_unnecessary_apps()
+            
+            # Enable Do Not Disturb
+            self.toggle_do_not_disturb(True)
+            
+            # Clean up desktop if requested
+            if data.get("clean_desktop", False):
+                self._clean_desktop()
+            
+            # Open presentation software based on type
+            if data.get("presentation_type") == "demo":
+                # Setup for code demo
+                os.system("open -a 'Visual Studio Code'")
+                self.manage_windows("maximize", "Visual Studio Code")
+                os.system("open -a Terminal")
+                self.manage_windows("arrange", "Terminal")
+            else:
+                # Setup for regular presentation
+                os.system("open -a Keynote")
+                self.manage_windows("maximize", "Keynote")
+            
+            # Setup second screen if available
+            self._setup_presentation_displays()
+            
+            return "Presentation workspace ready"
+        except Exception as e:
+            self.logger.error(f"Error setting up presentation: {e}")
+            return f"Error setting up presentation: {str(e)}"
+
+    def _clean_desktop(self) -> None:
+        """Temporarily hide desktop icons"""
+        self.execute_system_command(
+            'defaults write com.apple.finder CreateDesktop false; killall Finder'
+        )
+
+    def _setup_presentation_displays(self) -> None:
+        """Setup display arrangement for presentation"""
+        try:
+            # Check for multiple displays
+            script = '''
+            tell application "System Events"
+                tell process "System Preferences"
+                    click menu item "Displays" of menu "View" of menu bar 1
+                end tell
+            end tell
+            '''
+            self.execute_system_command(script)
+            # Additional display setup can be added here
+        except Exception as e:
+            self.logger.error(f"Error setting up displays: {e}")
 
     def _minimize_distracting_apps(self) -> None:
         """Minimize potentially distracting applications"""
@@ -352,6 +395,199 @@ class MacAutomation:
         """Clean up downloads folder"""
         downloads_path = os.path.expanduser("~/Downloads")
         # Implementation depends on cleanup preferences
+        pass
+
+    async def code_review_setup(self, repo_url: str, pr_number: str) -> Dict[str, Any]:
+        """Setup complete environment for code review"""
+        try:
+            results = {}
+            # Clone/pull repository
+            results["repo"] = await self._run_command(f"git clone {repo_url} review_workspace")
+            
+            # Checkout PR
+            results["pr"] = await self._run_command(f"gh pr checkout {pr_number}")
+            
+            # Open VSCode with diff view
+            results["editor"] = await self._run_command("code --diff HEAD^")
+            
+            # Open PR in browser
+            results["browser"] = await self._run_command(f"gh pr view {pr_number} --web")
+            
+            # Start local dev environment
+            results["dev_env"] = await self.start_development_environment()
+            
+            return {"success": True, "results": results}
+        except Exception as e:
+            self.logger.error(f"Code review setup failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def meeting_preparation(self, calendar_event: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare system for an upcoming meeting"""
+        try:
+            # Create meeting directory if it doesn't exist
+            meeting_dir = os.path.expanduser("~/Documents/MeetingNotes")
+            os.makedirs(meeting_dir, exist_ok=True)
+            
+            # Generate meeting notes file name
+            meeting_name = calendar_event.get("title", "meeting").lower().replace(" ", "_")
+            notes_file = f"{meeting_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
+            notes_path = os.path.join(meeting_dir, notes_file)
+            
+            # Create and populate meeting notes
+            with open(notes_path, 'w') as f:
+                f.write(f"# {calendar_event.get('title', 'Meeting Notes')}\n")
+                f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
+                f.write("## Agenda\n\n## Notes\n\n## Action Items\n")
+            
+            # Close unnecessary applications
+            await self._run_command("osascript -e 'tell application \"System Events\" to close every application not in {\"Calendar\", \"Notes\", \"zoom.us\"}'")
+            
+            # Open meeting notes in default editor
+            os.system(f"open {notes_path}")
+            
+            # Set up Do Not Disturb
+            self.toggle_do_not_disturb(True)
+            
+            # Connect to meeting if URL is available
+            meeting_url = calendar_event.get("location", "")
+            if any(platform in meeting_url.lower() for platform in ["zoom.us", "teams", "meet.google"]):
+                os.system(f"open '{meeting_url}'")
+            
+            # Arrange windows
+            self._setup_meeting_layout()
+            
+            return {
+                "success": True,
+                "notes_file": notes_path,
+                "meeting_url": meeting_url
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Meeting preparation failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def start_development_environment(self, project_path: Optional[str] = None) -> Dict[str, Any]:
+        """Start complete development environment"""
+        try:
+            results = {}
+            
+            # Start development containers if docker-compose exists
+            if os.path.exists("docker-compose.yml"):
+                results["docker"] = await self._run_command("docker-compose up -d")
+            
+            # Start database
+            results["db"] = await self._run_command("brew services start postgresql")
+            
+            # Start required services
+            services = ["redis", "elasticsearch", "mongodb"]
+            for service in services:
+                if self._check_service_needed(service):
+                    results[service] = await self._run_command(f"brew services start {service}")
+            
+            # Setup IDE workspace
+            results["ide"] = await self._setup_ide_workspace(project_path)
+            
+            # Start dev server
+            if os.path.exists("package.json"):
+                results["npm"] = await self._run_command("npm run dev")
+            elif os.path.exists("manage.py"):
+                results["django"] = await self._run_command("python manage.py runserver")
+            
+            return {"success": True, "results": results}
+        except Exception as e:
+            self.logger.error(f"Development environment setup failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def create_project_scaffold(self, project_type: str, name: str) -> Dict[str, Any]:
+        """Create new project with best practices setup"""
+        try:
+            results = {}
+            
+            if project_type == "react":
+                results["create"] = await self._run_command(f"npx create-react-app {name} --template typescript")
+                results["deps"] = await self._run_command("npm install @testing-library/react eslint prettier husky")
+                
+            elif project_type == "python":
+                results["venv"] = await self._run_command(f"python -m venv {name}_env")
+                results["deps"] = await self._run_command("pip install black pylint pytest")
+                
+            # Setup Git
+            results["git"] = await self._run_command("git init")
+            
+            # Create GitHub repository
+            results["github"] = await self._run_command(f"gh repo create {name} --private")
+            
+            # Setup CI/CD
+            await self._setup_cicd(project_type)
+            
+            return {"success": True, "results": results}
+        except Exception as e:
+            self.logger.error(f"Project scaffold creation failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def deep_system_cleanup(self) -> Dict[str, Any]:
+        """Perform comprehensive system cleanup"""
+        try:
+            results = {}
+            
+            # Clear system caches
+            results["cache"] = await self._run_command("sudo purge")
+            
+            # Remove unused Docker resources
+            results["docker"] = await self._run_command("docker system prune -af")
+            
+            # Clear package manager caches
+            results["brew"] = await self._run_command("brew cleanup")
+            results["npm"] = await self._run_command("npm cache clean --force")
+            
+            # Remove old Time Machine backups
+            results["timemachine"] = await self._run_command("tmutil thinLocalSnapshots / 524288000000000 4")
+            
+            # Empty trash
+            results["trash"] = await self._run_command("rm -rf ~/.Trash/*")
+            
+            return {"success": True, "results": results}
+        except Exception as e:
+            self.logger.error(f"System cleanup failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _run_command(self, command: str) -> Dict[str, Any]:
+        """Run shell command and return result"""
+        try:
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+            
+            return {
+                "success": process.returncode == 0,
+                "stdout": stdout.decode() if stdout else "",
+                "stderr": stderr.decode() if stderr else ""
+            }
+        except Exception as e:
+            self.logger.error(f"Command execution failed: {e}")
+            raise
+
+    async def _setup_meeting_layout(self):
+        """Setup window layout for meetings"""
+        # Implementation for arranging windows
+        pass
+
+    async def _setup_ide_workspace(self, project_path: Optional[str]) -> Dict[str, Any]:
+        """Setup IDE workspace with extensions and configurations"""
+        # Implementation for IDE setup
+        pass
+
+    async def _setup_cicd(self, project_type: str) -> Dict[str, Any]:
+        """Setup CI/CD workflows based on project type"""
+        # Implementation for CI/CD setup
+        pass
+
+    def _check_service_needed(self, service: str) -> bool:
+        """Check if a service is needed for the current project"""
+        # Implementation for service check
         pass
 
 class MacUtils:

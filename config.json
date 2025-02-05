@@ -1,0 +1,119 @@
+{
+    "WHISPER_MODEL": "base",
+    "SAMPLE_RATE": 16000,
+    "CHUNK_SIZE": 1024,
+    "CHANNELS": 1,
+    "RECORD_SECONDS": 3,
+    "WAKE_WORD": "friday",
+    "VOICE_ID": "com.apple.speech.synthesis.voice.karen",
+    "LOG_LEVEL": 20,
+    "LOG_FILE": "friday.log",
+    "MEMORY_FILE": "memory.json",
+    "CONFIG_FILE": "config.json",
+    "USER_PREFS_FILE": "user_prefs.json",
+    "WOLFRAM_ALPHA_KEY": "",
+    "NEWS_API_KEY": "",
+    "WEATHER_API_KEY": "",
+    "PERSONALITY_TRAITS": {
+        "friendliness": 0.8,
+        "professionalism": 0.7,
+        "humor": 0.4,
+        "formality": 0.5,
+        "empathy": 0.9,
+        "curiosity": 0.6
+    },
+    "PERSONALITY_CONFIG": {
+        "base_traits": {
+            "name": "Friday",
+            "core_personality": "helpful_professional",
+            "learning_rate": 0.1,
+            "adaptation_speed": 0.2
+        },
+        "interaction_style": {
+            "morning": {
+                "greeting_style": "energetic",
+                "proactiveness": 0.8
+            },
+            "workday": {
+                "greeting_style": "professional",
+                "proactiveness": 0.6
+            },
+            "evening": {
+                "greeting_style": "relaxed",
+                "proactiveness": 0.4
+            }
+        }
+    },
+    "USER_PREFERENCES": {
+        "name": "",
+        "preferred_name": "",
+        "location": "",
+        "weather_unit": "celsius",
+        "news_topics": [
+            "technology",
+            "science"
+        ],
+        "favorite_music": [],
+        "work_hours": "9:00-17:00",
+        "focus_mode_apps": [
+            "Messages",
+            "Mail"
+        ]
+    },
+    "CONTEXT_MEMORY_SIZE": 10,
+    "CONVERSATION_EXPIRY": 300,
+    "MAX_CONVERSATION_TURNS": 5,
+    "OLLAMA_API": "http://localhost:11434/api/generate",
+    "MODEL": "llama2:13b",
+    "SYSTEM_PROMPT": "You are FRIDAY, an AI assistant. Be helpful, concise, and intelligent.",
+    "ADVANCED_FEATURES": {
+        "pattern_recognition": {
+            "min_sequence_length": 3,
+            "pattern_confidence_threshold": 0.75,
+            "learning_rate": 0.1
+        },
+        "system_optimization": {
+            "cpu_threshold": 80,
+            "memory_threshold": 85,
+            "battery_optimization": true,
+            "auto_cleanup_threshold": 0.8
+        },
+        "workflow_intelligence": {
+            "project_detection_enabled": true,
+            "environment_preparation": true,
+            "git_integration": true
+        },
+        "proactive_features": {
+            "suggestion_threshold": 0.65,
+            "interruption_threshold": 0.85,
+            "quiet_hours": ["22:00-06:00"]
+        }
+    },
+    "WORKFLOW_CONFIGS": {
+        "coding_session": {
+            "apps": ["VSCode", "Terminal", "Browser"],
+            "layout": "coding_layout",
+            "focus_mode": true,
+            "auto_save": true
+        },
+        "meeting_prep": {
+            "calendar_check": true,
+            "doc_preload": true,
+            "notification_mode": "priority_only"
+        }
+    },
+    "LEARNING_PARAMETERS": {
+        "context_window": 1000,
+        "pattern_memory_size": 500,
+        "adaptation_rate": 0.15,
+        "forget_factor": 0.01
+    },
+    "VOICE_COMMANDS": {
+        "wake_word": "friday",
+        "command_patterns": {
+            "system_status": ["how's the system", "system status"],
+            "coding_mode": ["start coding", "coding mode"],
+            "work_mode": ["start work", "work mode"]
+        }
+    }
+}

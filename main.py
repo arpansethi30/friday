@@ -3,7 +3,8 @@ import sys
 import time
 import random
 import logging
-from typing import Optional
+import asyncio
+from typing import Dict, List, Any, Optional, Tuple
 from modules.speech import Speech
 from modules.tasks import TaskManager
 from modules.memory import Memory
@@ -11,8 +12,17 @@ from modules.mac_automation import MacAutomation
 from modules.personality import Personality
 from modules.brain import Brain
 from config import Config
+from features.ai_core import AICore
+from features.system_control import SystemController
+from features.home_automation import HomeAutomation
+from features.vision import VisionSystem  # Add this import
+from modules.communication_manager import CommunicationManager
+from modules.web_assistant import WebAssistant
+
+# Remove unused imports and simplify warnings
 import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore")
+
 class FRIDAY:
     def __init__(self):
         # Load configuration
@@ -34,6 +44,14 @@ class FRIDAY:
             self.mac = MacAutomation(self.config)
             self.personality = Personality(self.config)
             self.brain = Brain(self.config)
+            self.ai_core = AICore()
+            self.system_controller = SystemController()
+            self.vision_system = VisionSystem()
+            self.home_automation = HomeAutomation()
+            self.comm_manager = CommunicationManager(self.config)
+            self.web_assistant = WebAssistant(self.config)
+            self.personal_memory = PersonalMemory(self.config)
+            self.interaction_logger = InteractionLogger(self.config)
             
             self.startup_phrases = [
                 "Systems online. Ready to assist.",
@@ -112,8 +130,31 @@ class FRIDAY:
     def handle_command(self, command: str) -> str:
         """Handle user commands"""
         try:
-            # First try Mac-specific commands
-            if any(keyword in command.lower() for keyword in ["workspace", "window", "screen", "system"]):
+            # Normalize command for better matching
+            cmd = command.lower().strip()
+            
+            # Email commands
+            if "write" in cmd and "mail" in cmd:
+                return self._handle_email_command(cmd)
+            
+            # Web search commands
+            if "search" in cmd or "look up" in cmd or "find" in cmd:
+                return self._handle_web_search(cmd)
+            
+            # Meeting and presentation commands
+            if "prepare" in cmd or "setup" in cmd:
+                if "meeting" in cmd or "standup" in cmd:
+                    calendar_event = self._get_next_meeting()
+                    return asyncio.run(self.mac.meeting_preparation(calendar_event or {}))
+                elif "presentation" in cmd or "demo" in cmd:
+                    return self.mac.workspace_management("presentation", {
+                        "presentation_type": "demo" if "demo" in cmd else "presentation",
+                        "clean_desktop": True,
+                        "focus_mode": True
+                    })
+            
+            # Check other Mac-specific commands
+            if any(keyword in cmd for keyword in ["workspace", "window", "screen", "system"]):
                 return self._handle_mac_command(command)
             
             # Then try regular task commands
@@ -123,8 +164,139 @@ class FRIDAY:
             self.logger.error(f"Error handling command: {e}")
             return f"I encountered an error: {str(e)}"
 
+    def handle_command(self, command: str) -> str:
+        try:
+            # Process command
+            response = super().handle_command(command)
+            
+            # Log the interaction
+            self.interaction_logger.log_command(command, True, response)
+            
+            # Learn from interaction
+            self.personal_memory.learn_from_interaction({
+                'topic': 'command_execution',
+                'data': {
+                    'command': command,
+                    'response': response,
+                    'context': self.brain.get_conversation_context()
+                },
+                'source': 'command_handler',
+                'confidence': 0.8
+            })
+            
+            return response
+            
+        except Exception as e:
+            self.interaction_logger.log_command(command, False, str(e))
+            return f"Error: {str(e)}"
+
+    def _handle_email_command(self, command: str) -> str:
+        """Handle email-related commands"""
+        try:
+            # Check if it's a read email command
+            if "check" in command and "email" in command:
+                email_status = self.comm_manager.check_unread_emails()
+                if "error" not in email_status:
+                    unread = email_status["unread_count"]
+                    urgent = len(email_status.get("urgent_messages", []))
+                    return f"You have {unread} unread emails, {urgent} of them marked as urgent."
+                return f"Error checking emails: {email_status['error']}"
+
+            # Extract recipient and context
+            recipient = self._extract_recipient(command)
+            context = {
+                'recipient': recipient,
+                'intent': 'absence' if 'won\'t' in command or 'not coming' in command else 'general',
+                'reason': self._extract_reason(command)
+            }
+            
+            # Compose email
+            email_data = self.comm_manager.compose_email(context)
+            if 'error' in email_data:
+                return f"Error composing email: {email_data['error']}"
+            
+            # Open in native Mail app
+            if self.comm_manager.compose_mail_native(email_data):
+                return f"Email drafted to {recipient} in Mail app. Please review before sending."
+            return "Error creating email in Mail app"
+            
+        except Exception as e:
+            self.logger.error(f"Error handling email command: {e}")
+            return f"Error processing email command: {str(e)}"
+
+    def _handle_web_search(self, command: str) -> str:
+        """Handle web search commands"""
+        try:
+            # Extract search query
+            query = command.replace("search", "").replace("look up", "").replace("find", "").strip()
+            
+            # Perform search
+            results = self.web_assistant.search_and_summarize(query)
+            if 'error' in results:
+                return f"Error searching: {results['error']}"
+            
+            return results['summary']
+            
+        except Exception as e:
+            self.logger.error(f"Error handling web search: {e}")
+            return f"Error processing web search: {str(e)}"
+
+    def _extract_recipient(self, command: str) -> str:
+        """Extract recipient name from command"""
+        # Basic extraction - can be enhanced with NLP
+        words = command.split()
+        if "to" in words:
+            idx = words.index("to")
+            if idx + 1 < len(words):
+                return words[idx + 1]
+        return ""
+
+    def _extract_reason(self, command: str) -> str:
+        """Extract reason from command"""
+        # Basic extraction - can be enhanced with NLP
+        if "because" in command:
+            return command.split("because")[1].strip()
+        return "personal reasons"
+
     def _handle_mac_command(self, command: str) -> str:
         """Handle Mac-specific commands"""
+        try:
+            # Development workflow commands
+            if "setup project" in command:
+                project_type = "react" if "react" in command else "python"
+                name = command.split()[-1]
+                return asyncio.run(self.mac.create_project_scaffold(project_type, name))
+                
+            # Code review workflow
+            elif "review pr" in command:
+                parts = command.split()
+                repo_url = parts[-2]
+                pr_number = parts[-1]
+                return asyncio.run(self.mac.code_review_setup(repo_url, pr_number))
+                
+            # Meeting preparation
+            elif "prepare meeting" in command:
+                calendar_event = self._get_next_meeting()
+                return asyncio.run(self.mac.meeting_preparation(calendar_event))
+                
+            # Development environment
+            elif "start dev" in command:
+                project_path = self._extract_project_path(command)
+                return asyncio.run(self.mac.start_development_environment(project_path))
+                
+            # System maintenance
+            elif "cleanup system" in command:
+                return asyncio.run(self.mac.deep_system_cleanup())
+                
+            # Fall back to existing simple commands
+            return self._handle_basic_mac_command(command)
+            
+        except Exception as e:
+            self.logger.error(f"Error in Mac command handling: {e}")
+            return f"I encountered an error: {str(e)}"
+
+    def _handle_basic_mac_command(self, command: str) -> str:
+        """Handle basic Mac commands (existing implementation)"""
         # Workspace commands
         if "setup workspace" in command:
             if "coding" in command:
@@ -199,6 +371,48 @@ class FRIDAY:
             if keyword in command.lower():
                 return app_name
         return None
+
+    def process_command(self, command):
+        # Process natural language
+        response, emotion = self.ai_core.process_natural_language(command)
+        
+        # Check system commands
+        if "system" in command.lower():
+            return self.system_controller.monitor_system_resources()
+        
+        # Check home automation commands
+        if "lights" in command.lower() or "temperature" in command.lower():
+            return self.home_automation.discover_devices()
+            
+        # Default response
+        return response
+
+    def _get_next_meeting(self) -> Dict[str, Any]:
+        """Get next meeting details from calendar"""
+        try:
+            script = '''
+            tell application "Calendar"
+                set currentDate to current date
+                set nextEvent to first event whose start date is greater than or equal to currentDate
+                return {summary:summary of nextEvent, location:location of nextEvent, start date:start date of nextEvent}
+            end tell
+            '''
+            result = self.mac.execute_system_command(script)
+            if result and "Error" not in result:
+                return {
+                    "title": result.get("summary", "Untitled Meeting"),
+                    "location": result.get("location", ""),
+                    "start_time": result.get("start date", "")
+                }
+            return {}
+        except Exception as e:
+            self.logger.error(f"Error getting next meeting: {e}")
+            return {}
+
+    def _extract_project_path(self, command: str) -> Optional[str]:
+        """Extract project path from command"""
+        # Implementation for path extraction
+        pass
 
 if __name__ == "__main__":
     friday = FRIDAY()

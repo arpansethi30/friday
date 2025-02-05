@@ -4,6 +4,7 @@ import logging
 import json
 import os
 from datetime import datetime
+from security.encryption_utils import EncryptionManager
 
 def default_personality_traits() -> Dict[str, float]:
     return {
@@ -58,18 +59,56 @@ class Config:
     CONTEXT_MEMORY_SIZE: int = 10
     CONVERSATION_EXPIRY: int = 300  # 5 minutes
     MAX_CONVERSATION_TURNS: int = 5
+
+    # Llama Model Settings
+    OLLAMA_API: str = "http://localhost:11434/api/generate"  # Ollama API endpoint
+    MODEL: str = "llama2:13b"  # Using Llama 2 13B parameter model
+    SYSTEM_PROMPT: str = """You are FRIDAY, an AI assistant. Be helpful, concise, and intelligent."""
+
+    # Directories
+    PERSONAL_DATA_DIR: str = "~/.friday/personal_data"
+    LOGS_DIR: str = "~/.friday/logs"
     
     @classmethod
     def load(cls):
-        if os.path.exists(cls.CONFIG_FILE):
-            with open(cls.CONFIG_FILE, 'r') as f:
-                config_data = json.load(f)
+        encryption = EncryptionManager()
+        
+        # First try loading encrypted local config
+        local_config = Path.home() / '.friday' / 'config.local.json'
+        if local_config.exists():
+            try:
+                encrypted_data = local_config.read_bytes()
+                config_data = encryption.decrypt(encrypted_data)
                 return cls(**config_data)
+            except Exception:
+                pass
+                
+        # Fall back to default config
         return cls()
-    
+        
     def save(self):
+        encryption = EncryptionManager()
+        
+        # Save sensitive data to encrypted local config
+        sensitive_data = {
+            'USER_PREFERENCES': self.USER_PREFERENCES,
+            'API_KEYS': {
+                'WOLFRAM_ALPHA_KEY': self.WOLFRAM_ALPHA_KEY,
+                'NEWS_API_KEY': self.NEWS_API_KEY,
+                'WEATHER_API_KEY': self.WEATHER_API_KEY
+            }
+        }
+        
+        local_config = Path.home() / '.friday' / 'config.local.json'
+        local_config.parent.mkdir(parents=True, exist_ok=True)
+        local_config.write_bytes(encryption.encrypt(sensitive_data))
+        os.chmod(str(local_config), 0o600)
+        
+        # Save non-sensitive data to regular config
+        safe_config = {k: v for k, v in self.__dict__.items() 
+                      if k not in ['USER_PREFERENCES', 'API_KEYS']}
         with open(self.CONFIG_FILE, 'w') as f:
-            json.dump(self.__dict__, f, indent=4)
+            json.dump(safe_config, f, indent=4)
             
     def update_user_preferences(self, preferences: Dict[str, str]):
         self.USER_PREFERENCES.update(preferences)
