@@ -1,0 +1,39 @@
+{
+    "companion_traits": {
+        "proactiveness": 0.7,
+        "learning_rate": 0.1,
+        "suggestion_frequency": "medium",
+        "interruption_threshold": 0.8
+    },
+    "work_routines": {
+        "morning": {
+            "start_time": "09:00",
+            "checks": ["system", "updates", "calendar", "email"],
+            "preparations": ["dev_env", "focus_mode", "notifications"]
+        },
+        "evening": {
+            "checks": ["backups", "commits", "tasks"],
+            "cleanup": ["temp_files", "docker", "branches"],
+            "summary": ["achievements", "tomorrow_prep"]
+        }
+    },
+    "development": {
+        "ide_preferences": {
+            "vscode": {
+                "layout": "coding",
+                "extensions": ["recommended"],
+                "terminal_config": "development"
+            }
+        },
+        "environment_checks": {
+            "frequency": "daily",
+            "components": ["virtualenv", "docker", "node", "java"]
+        }
+    },
+    "health_tracking": {
+        "break_interval": 30,
+        "posture_check": 20,
+        "eye_exercise": 25,
+        "water_reminder": 45
+    }
+}

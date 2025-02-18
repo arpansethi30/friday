@@ -1,5 +1,19 @@
+from .speech import Speech
+from .tasks import TaskManager
+from .memory import Memory
+from .mac_automation import MacAutomation
+from .personality import Personality
+from .brain import Brain
 from .communication_manager import CommunicationManager
 from .web_assistant import WebAssistant
-from .mac_automation import MacAutomation
 
-__all__ = ['CommunicationManager', 'WebAssistant', 'MacAutomation']
+__all__ = [
+    'Speech',
+    'TaskManager',
+    'Memory',
+    'MacAutomation',
+    'Personality',
+    'Brain',
+    'CommunicationManager',
+    'WebAssistant'
+]

@@ -4,6 +4,7 @@ import time
 import random
 import logging
 import asyncio
+from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from modules.speech import Speech
 from modules.tasks import TaskManager
@@ -23,6 +24,24 @@ from modules.web_assistant import WebAssistant
 import warnings
 warnings.filterwarnings("ignore")
 
+# Add missing class definitions
+class PersonalMemory:
+    def __init__(self, config):
+        self.config = config
+        
+    def learn_from_interaction(self, data):
+        # Implement learning logic
+        pass
+
+class InteractionLogger:
+    def __init__(self, config):
+        self.config = config
+        
+    def log_command(self, command, success, response):
+        # Implement logging logic
+        pass
+
+# Fix FRIDAY class inheritance
 class FRIDAY:
     def __init__(self):
         # Load configuration
@@ -84,6 +103,9 @@ class FRIDAY:
                     # Listen for wake word
                     text = self.speech.listen_and_transcribe()
                     
+                    if text:
+                        print(f"\nYou said: {text}")
+                    
                     if text and self.config.WAKE_WORD.lower() in text.lower():
                         # Acknowledge wake word
                         self.speech.speak(random.choice(self.acknowledgments))
@@ -92,6 +114,7 @@ class FRIDAY:
                         command = self.speech.listen_and_transcribe()
                         
                         if command:
+                            print(f"You said: {command}")
                             # Process command through brain for understanding
                             intent, entities, confidence = self.brain.process_input(command)
                             
@@ -104,6 +127,7 @@ class FRIDAY:
                             
                             # Speak response
                             self.speech.speak(personalized_response)
+                            print(f"Friday: {personalized_response}")
                             
                             # Store in memory
                             self.memory.add_interaction(command, personalized_response)
@@ -128,46 +152,9 @@ class FRIDAY:
             self.logger.info("FRIDAY shutdown complete")
 
     def handle_command(self, command: str) -> str:
-        """Handle user commands"""
-        try:
-            # Normalize command for better matching
-            cmd = command.lower().strip()
-            
-            # Email commands
-            if "write" in cmd and "mail" in cmd:
-                return self._handle_email_command(cmd)
-            
-            # Web search commands
-            if "search" in cmd or "look up" in cmd or "find" in cmd:
-                return self._handle_web_search(cmd)
-            
-            # Meeting and presentation commands
-            if "prepare" in cmd or "setup" in cmd:
-                if "meeting" in cmd or "standup" in cmd:
-                    calendar_event = self._get_next_meeting()
-                    return asyncio.run(self.mac.meeting_preparation(calendar_event or {}))
-                elif "presentation" in cmd or "demo" in cmd:
-                    return self.mac.workspace_management("presentation", {
-                        "presentation_type": "demo" if "demo" in cmd else "presentation",
-                        "clean_desktop": True,
-                        "focus_mode": True
-                    })
-            
-            # Check other Mac-specific commands
-            if any(keyword in cmd for keyword in ["workspace", "window", "screen", "system"]):
-                return self._handle_mac_command(command)
-            
-            # Then try regular task commands
-            return self.tasks.execute_command(command)
-            
-        except Exception as e:
-            self.logger.error(f"Error handling command: {e}")
-            return f"I encountered an error: {str(e)}"
-
-    def handle_command(self, command: str) -> str:
         try:
             # Process command
-            response = super().handle_command(command)
+            response = self._base_handle_command(command)
             
             # Log the interaction
             self.interaction_logger.log_command(command, True, response)
@@ -189,6 +176,54 @@ class FRIDAY:
         except Exception as e:
             self.interaction_logger.log_command(command, False, str(e))
             return f"Error: {str(e)}"
+
+    def _base_handle_command(self, command: str) -> str:
+        """Base handle_command implementation"""
+        try:
+            cmd = command.lower().strip()
+            
+            # Improve workspace setup command recognition
+            if any(phrase in cmd for phrase in ["setup workspace", "set up workspace", "setup development", "setup coding"]):
+                return self.mac.workspace_management("coding")
+                
+            # Add workspace setup handling
+            if "setup" in cmd and "workspace" in cmd:
+                if "coding" in cmd or "development" in cmd:
+                    return self.mac.workspace_management("coding")
+                elif "writing" in cmd:
+                    return self.mac.workspace_management("writing")
+                elif "research" in cmd:
+                    return self.mac.workspace_management("research")
+                return "Please specify workspace type (coding, writing, or research)"
+            
+            # Add brightness control
+            if "brightness" in cmd:
+                if any(word in cmd for word in ["increase", "up", "higher"]):
+                    return self.mac.adjust_brightness("increase")
+                elif any(word in cmd for word in ["decrease", "down", "lower"]):
+                    return self.mac.adjust_brightness("decrease")
+            
+            # Check for open application commands
+            if cmd.startswith(("open ", "launch ", "start ")):
+                app_name = self._extract_app_name(cmd)
+                if app_name:
+                    result = self.mac.open_application(app_name)
+                    return result
+                return "Please specify which application to open"
+                
+            # Process the command
+            if "email" in cmd:
+                return self._handle_email_command(cmd)
+            elif any(term in cmd for term in ["search", "look up", "find"]):
+                return self._handle_web_search(cmd)
+            elif any(keyword in cmd for keyword in ["workspace", "window", "screen", "system"]):
+                return self._handle_mac_command(cmd)
+            else:
+                return self.tasks.execute_command(command)
+                
+        except Exception as e:
+            self.logger.error(f"Error handling command: {e}")
+            return f"I encountered an error: {str(e)}"
 
     def _handle_email_command(self, command: str) -> str:
         """Handle email-related commands"""
@@ -353,39 +388,16 @@ class FRIDAY:
 
     def _extract_app_name(self, command: str) -> Optional[str]:
         """Extract application name from command"""
-        common_apps = {
-            "safari": "Safari",
-            "chrome": "Google Chrome",
-            "firefox": "Firefox",
-            "terminal": "Terminal",
-            "vscode": "Visual Studio Code",
-            "code": "Visual Studio Code",
-            "notes": "Notes",
-            "mail": "Mail",
-            "messages": "Messages",
-            "slack": "Slack",
-            "zoom": "zoom.us"
-        }
-        
-        for keyword, app_name in common_apps.items():
-            if keyword in command.lower():
-                return app_name
-        return None
-
-    def process_command(self, command):
-        # Process natural language
-        response, emotion = self.ai_core.process_natural_language(command)
-        
-        # Check system commands
-        if "system" in command.lower():
-            return self.system_controller.monitor_system_resources()
-        
-        # Check home automation commands
-        if "lights" in command.lower() or "temperature" in command.lower():
-            return self.home_automation.discover_devices()
+        # Remove command words
+        for prefix in ["open", "launch", "start"]:
+            command = command.replace(prefix, "")
             
-        # Default response
-        return response
+        # Clean and get the app name
+        app_name = command.strip()
+        
+        if app_name:
+            return app_name
+        return None
 
     def _get_next_meeting(self) -> Dict[str, Any]:
         """Get next meeting details from calendar"""
@@ -408,11 +420,6 @@ class FRIDAY:
         except Exception as e:
             self.logger.error(f"Error getting next meeting: {e}")
             return {}
-
-    def _extract_project_path(self, command: str) -> Optional[str]:
-        """Extract project path from command"""
-        # Implementation for path extraction
-        pass
 
 if __name__ == "__main__":
     friday = FRIDAY()

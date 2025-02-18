@@ -86,6 +86,63 @@ cp config/config.example.json config/config.json
 vim config/config.json
 ```
 
+## Quick Start
+
+1. Ensure Prerequisites:
+
+```bash
+# Check Python version (3.9+ required)
+python3 --version
+
+# Install Ollama
+curl https://ollama.ai/install.sh | sh
+
+# Pull Llama2 model
+ollama pull llama2:13b
+```
+
+2. Setup Environment:
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/friday.git
+cd friday
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Unix/macOS
+.\venv\Scripts\activate   # On Windows
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+3. Configure Friday:
+
+```bash
+# Copy example configs
+cp config/config.example.json config/config.json
+cp config/workspace_config.example.json config/workspace_config.json
+
+# Edit configurations with your preferences
+vim config/config.json
+```
+
+4. Initialize Database:
+
+```bash
+# Create database
+sqlite3 database/friday.db < database/schema.sql
+sqlite3 database/friday.db < database/workspace_schema.sql
+```
+
+5. Run Friday:
+
+```bash
+# Start the assistant
+python friday.py
+```
+
 ## Configuration
 
 ### Essential Settings
@@ -132,6 +189,91 @@ python friday.py
 "Friday, track git changes"
 "Friday, prepare for coding"
 ```
+
+## Usage Examples
+
+1. Basic Commands:
+
+```bash
+"Friday, how's the system doing?"
+"Friday, start coding mode"
+"Friday, optimize system"
+```
+
+2. Workspace Management:
+
+```bash
+"Friday, start backend project"
+"Friday, save current workspace"
+"Friday, restore last session"
+```
+
+3. System Control:
+
+```bash
+"Friday, optimize for performance"
+"Friday, enable focus mode"
+"Friday, start break timer"
+```
+
+## Troubleshooting
+
+1. Database Issues:
+
+```bash
+# Reset database
+rm database/friday.db
+sqlite3 database/friday.db < database/schema.sql
+sqlite3 database/friday.db < database/workspace_schema.sql
+```
+
+2. Model Issues:
+
+```bash
+# Restart Ollama
+sudo systemctl restart ollama
+
+# Verify model
+ollama list
+```
+
+3. Permission Issues:
+
+```bash
+# Fix permissions
+chmod +x friday.py
+chmod -R 755 src/
+```
+
+## Monitoring Logs
+
+```bash
+# View logs
+tail -f friday.log
+
+# Check system metrics
+sqlite3 database/friday.db "SELECT * FROM system_metrics ORDER BY timestamp DESC LIMIT 10;"
+```
+
+## Customization
+
+1. Add Custom Commands:
+
+- Edit `config/config.json`
+- Add patterns to `VOICE_COMMANDS`
+- Implement handlers in `voice_handler.py`
+
+2. Modify Workspace Profiles:
+
+- Edit `config/workspace_config.json`
+- Add new workspace profiles
+- Customize resource allocations
+
+3. Adjust Learning Parameters:
+
+- Modify `LEARNING_PARAMETERS` in config
+- Tune pattern recognition settings
+- Adjust adaptation rates
 
 ## Project Structure
 

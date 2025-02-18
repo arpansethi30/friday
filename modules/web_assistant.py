@@ -10,6 +10,8 @@ import logging
 from typing import Dict, List, Any, Optional
 import json
 import os
+import requests
+from selenium.webdriver.chrome.options import Options
 
 class WebAssistant:
     def __init__(self, config):
@@ -21,7 +23,7 @@ class WebAssistant:
     def _setup_browser(self):
         """Setup selenium webdriver with automatic ChromeDriver installation"""
         try:
-            options = webdriver.ChromeOptions()
+            options = Options()
             if not hasattr(self.config, 'DEBUG') or not self.config.DEBUG:
                 options.add_argument('--headless')
             options.add_argument('--no-sandbox')
@@ -112,3 +114,10 @@ class WebAssistant:
             summary += f"{i}. {result['title']}\n"
             summary += f"   {result['snippet']}\n\n"
         return summary
+
+    def __del__(self):
+        """Cleanup browser when object is destroyed"""
+        try:
+            self.driver.quit()
+        except:
+            pass

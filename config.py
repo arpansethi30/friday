@@ -3,6 +3,7 @@ from typing import Dict, List
 import logging
 import json
 import os
+from pathlib import Path
 from datetime import datetime
 from security.encryption_utils import EncryptionManager
 
@@ -69,22 +70,49 @@ class Config:
     PERSONAL_DATA_DIR: str = "~/.friday/personal_data"
     LOGS_DIR: str = "~/.friday/logs"
     
+    # Application settings
+    APP_PATHS: Dict[str, str] = field(default_factory=lambda: {
+        "safari": "/Applications/Safari.app",
+        "chrome": "/Applications/Google Chrome.app",
+        "vscode": "/Applications/Visual Studio Code.app",
+        "terminal": "/System/Applications/Utilities/Terminal.app"
+    })
+    
     @classmethod
     def load(cls):
-        encryption = EncryptionManager()
-        
-        # First try loading encrypted local config
-        local_config = Path.home() / '.friday' / 'config.local.json'
-        if local_config.exists():
-            try:
-                encrypted_data = local_config.read_bytes()
-                config_data = encryption.decrypt(encrypted_data)
-                return cls(**config_data)
-            except Exception:
-                pass
+        """Load configuration with conda environment support"""
+        try:
+            # Check if running in conda environment
+            conda_prefix = os.environ.get('CONDA_PREFIX')
+            if (conda_prefix):
+                # Use conda environment path for logs and data
+                cls.PERSONAL_DATA_DIR = os.path.join(conda_prefix, 'friday_data')
+                cls.LOGS_DIR = os.path.join(conda_prefix, 'friday_logs')
                 
-        # Fall back to default config
-        return cls()
+                # Create directories if they don't exist
+                os.makedirs(cls.PERSONAL_DATA_DIR, exist_ok=True)
+                os.makedirs(cls.LOGS_DIR, exist_ok=True)
+                
+                # Update log file path
+                cls.LOG_FILE = os.path.join(cls.LOGS_DIR, 'friday.log')
+            
+            encryption = EncryptionManager()
+            
+            # First try loading encrypted local config
+            local_config = Path.home() / '.friday' / 'config.local.json'
+            if local_config.exists():
+                try:
+                    encrypted_data = local_config.read_bytes()
+                    config_data = encryption.decrypt(encrypted_data)
+                    return cls(**config_data)
+                except Exception:
+                    pass
+                    
+            # Fall back to default config
+            return cls()
+        except Exception as e:
+            logging.error(f"Error loading config: {e}")
+            return cls()
         
     def save(self):
         encryption = EncryptionManager()

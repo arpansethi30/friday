@@ -1,17 +1,39 @@
-openai-whisper
-sounddevice
-numpy
-requests
-python-dotenv
-PyAudio
-pyttsx3
-wolframalpha
-psutil
-pyautogui
-schedule
-webrtcvad
+# Core dependencies
 aiohttp
+numpy
 psutil
-dataclasses
-selenium>=4.1.0
-webdriver_manager>=3.8.0
+python-dotenv>=0.19.0
+SQLAlchemy
+asyncio>=3.4.3
+pytz
+
+# Voice processing
+SpeechRecognition>=3.8.1
+pyttsx3>=2.90
+pyaudio>=0.2.11
+nltk>=3.6.2
+
+# Voice and Speech
+openai-whisper
+
+# Development tools
+pytest
+black
+pylint
+
+# System integration
+pyobjc-framework-Cocoa  # For MacOS integration
+pyobjc-framework-Quartz
+keyboard
+pyobjc-framework-ApplicationServices
+
+# Machine Learning
+scikit-learn
+torch  # For M3 Max optimization
+
+# Web automation
+selenium>=4.0.0
+webdriver-manager>=3.8.0
+
+# Additional dependencies
+requests>=2.26.0

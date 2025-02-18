@@ -8,6 +8,12 @@ import applescript
 import pyautogui
 import json
 from config import Config
+import time  # Add this import at the top with other imports
+import psutil
+import shutil
+import requests
+import pyperclip
+from collections import deque
 
 class MacAutomation:
     def __init__(self, config: Config):
@@ -24,6 +30,46 @@ class MacAutomation:
         except Exception as e:
             self.logger.error(f"Error executing system command: {e}")
             return f"Error: {str(e)}"
+
+    def open_application(self, app_name: str) -> str:
+        """Open a macOS application by name"""
+        try:
+            # Normalize app name
+            app_mappings = {
+                'safari': 'Safari',
+                'chrome': 'Google Chrome',
+                'firefox': 'Firefox',
+                'terminal': 'Terminal',
+                'vscode': 'Visual Studio Code',
+                'code': 'Visual Studio Code'
+                # Add more mappings as needed
+            }
+            
+            # Get proper app name from mapping
+            normalized_name = app_mappings.get(app_name.lower(), app_name)
+            
+            # Construct and execute AppleScript
+            script = f'''
+                tell application "{normalized_name}"
+                    activate
+                end tell
+            '''
+            
+            proc = subprocess.Popen(['osascript', '-e', script], 
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            _, stderr = proc.communicate()
+            
+            if proc.returncode == 0:
+                return f"Successfully opened {normalized_name}"
+            else:
+                error = stderr.decode('utf-8')
+                self.logger.error(f"Error opening {normalized_name}: {error}")
+                return f"Failed to open {normalized_name}"
+                
+        except Exception as e:
+            self.logger.error(f"Error in open_application: {e}")
+            return f"Error opening application: {str(e)}"
 
     def manage_windows(self, action: str, app_name: Optional[str] = None) -> str:
         """Manage window arrangements and focus"""
@@ -138,24 +184,49 @@ class MacAutomation:
 
     def _setup_coding_workspace(self, data: Dict) -> str:
         """Setup coding workspace with preferred layout"""
-        # Open VS Code
-        os.system("open -a 'Visual Studio Code'")
-        self.manage_windows("maximize", "Visual Studio Code")
-        
-        # Open Terminal
-        os.system("open -a Terminal")
-        self.manage_windows("arrange", "Terminal")
-        
-        # Open browser with documentation if specified
-        if "docs_url" in data:
-            os.system(f"open -a Safari {data['docs_url']}")
+        try:
+            # Open required applications
+            apps_to_open = ["Visual Studio Code", "Terminal", "Safari"]
+            for app in apps_to_open:
+                result = self.open_application(app)
+                if "Failed" in result:
+                    self.logger.error(f"Failed to open {app}")
             
-        return "Coding workspace setup complete"
+            # Wait for applications to launch
+            time.sleep(2)  # Increased wait time for better reliability
+            
+            # Arrange windows in coding layout
+            script = '''
+                tell application "System Events"
+                    delay 1
+                    tell process "Code"
+                        set position of window 1 to {0, 0}
+                        set size of window 1 to {960, 1080}
+                    end tell
+                    
+                    tell process "Terminal"
+                        set position of window 1 to {961, 0}
+                        set size of window 1 to {479, 540}
+                    end tell
+                    
+                    tell process "Safari"
+                        set position of window 1 to {961, 541}
+                        set size of window 1 to {479, 539}
+                    end tell
+                end tell
+            '''
+            self.execute_system_command(script)
+            
+            return "Coding workspace setup complete"
+            
+        except Exception as e:
+            self.logger.error(f"Failed to setup coding workspace: {e}")
+            return f"Error setting up coding workspace: {str(e)}"
 
     def _setup_writing_workspace(self, data: Dict) -> str:
         """Setup writing workspace"""
         # Open preferred writing app
-        os.system("open -a Notes")
+        self.open_application("Notes")
         self.manage_windows("maximize", "Notes")
         
         # Minimize distracting apps
@@ -169,17 +240,17 @@ class MacAutomation:
     def _setup_research_workspace(self, data: Dict) -> str:
         """Setup research workspace"""
         # Open Safari for research
-        os.system("open -a Safari")
+        self.open_application("Safari")
         self.manage_windows("arrange", "Safari")
         
         # Open Notes for taking notes
-        os.system("open -a Notes")
+        self.open_application("Notes")
         self.manage_windows("arrange", "Notes")
         
         # Open specific research tools if specified
         if "research_tools" in data:
             for tool in data["research_tools"]:
-                os.system(f"open -a '{tool}'")
+                self.open_application(tool)
                 
         return "Research workspace setup complete"
 
@@ -199,13 +270,13 @@ class MacAutomation:
             # Open presentation software based on type
             if data.get("presentation_type") == "demo":
                 # Setup for code demo
-                os.system("open -a 'Visual Studio Code'")
+                self.open_application("Visual Studio Code")
                 self.manage_windows("maximize", "Visual Studio Code")
-                os.system("open -a Terminal")
+                self.open_application("Terminal")
                 self.manage_windows("arrange", "Terminal")
             else:
                 # Setup for regular presentation
-                os.system("open -a Keynote")
+                self.open_application("Keynote")
                 self.manage_windows("maximize", "Keynote")
             
             # Setup second screen if available
@@ -287,7 +358,7 @@ class MacAutomation:
         # Open required applications
         work_apps = params.get("apps", ["Mail", "Calendar", "Slack"])
         for app in work_apps:
-            os.system(f'open -a "{app}"')
+            self.open_application(app)
             
         # Set up workspace
         self.workspace_management(params.get("workspace", "coding"))
@@ -318,7 +389,7 @@ class MacAutomation:
         
         # Open meeting application (Zoom, Teams, etc.)
         meeting_app = params.get("meeting_app", "zoom.us")
-        os.system(f'open -a "{meeting_app}"')
+        self.open_application(meeting_app)
         
         # Enable Do Not Disturb
         self.toggle_do_not_disturb(True)
@@ -589,6 +660,256 @@ class MacAutomation:
         """Check if a service is needed for the current project"""
         # Implementation for service check
         pass
+
+    def adjust_brightness(self, direction: str) -> str:
+        """Adjust screen brightness up or down"""
+        try:
+            if direction.lower() == "increase":
+                script = '''
+                tell application "System Events"
+                    key code 144  -- Increase brightness
+                    key code 144
+                end tell
+                '''
+            else:
+                script = '''
+                tell application "System Events"
+                    key code 145  -- Decrease brightness
+                    key code 145
+                end tell
+                '''
+                
+            self.execute_system_command(script)
+            return f"Brightness {direction}d"
+            
+        except Exception as e:
+            self.logger.error(f"Error adjusting brightness: {e}")
+            return f"Failed to adjust brightness: {str(e)}"
+
+    def manage_network(self, action: str, params: Optional[Dict] = None) -> Dict[str, Any]:
+        """Network management functions"""
+        try:
+            actions = {
+                "wifi_toggle": self._toggle_wifi,
+                "wifi_status": self._get_wifi_status,
+                "ping": self._ping_host,
+                "speed_test": self._run_speed_test,
+                "dns_flush": self._flush_dns,
+                "proxy_set": self._set_proxy,
+                "scan_ports": self._scan_ports
+            }
+            
+            if action in actions:
+                return {"success": True, "result": actions[action](params)}
+            return {"success": False, "error": "Invalid network action"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _toggle_wifi(self, params: Optional[Dict] = None) -> str:
+        script = '''
+        do shell script "networksetup -setairportpower en0 toggle"
+        '''
+        return self.execute_system_command(script)
+
+    def _get_wifi_status(self, params: Optional[Dict] = None) -> Dict:
+        script = '''
+        do shell script "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I"
+        '''
+        return {"info": self.execute_system_command(script)}
+
+    def _ping_host(self, params: Dict) -> Dict:
+        host = params.get("host", "8.8.8.8")
+        count = params.get("count", "4")
+        result = subprocess.run(["ping", "-c", count, host], capture_output=True, text=True)
+        return {"output": result.stdout}
+
+    def _run_speed_test(self, params: Optional[Dict] = None) -> Dict:
+        # Simple speed test using fast.com or speedtest-cli
+        # Implementation would depend on preferred speed test method
+        pass
+
+    def clipboard_manager(self, action: str, data: Optional[str] = None) -> Dict[str, Any]:
+        """Enhanced clipboard management"""
+        try:
+            if not hasattr(self, '_clipboard_history'):
+                self._clipboard_history = deque(maxlen=50)  # Store last 50 items
+
+            actions = {
+                "copy": lambda: self._copy_to_clipboard(data),
+                "paste": self._paste_from_clipboard,
+                "clear": self._clear_clipboard,
+                "history": lambda: {"history": list(self._clipboard_history)},
+                "save": lambda: self._save_clipboard_to_file(data)
+            }
+
+            if action in actions:
+                return {"success": True, "result": actions[action]()}
+            return {"success": False, "error": "Invalid clipboard action"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _copy_to_clipboard(self, data: str) -> Dict:
+        pyperclip.copy(data)
+        self._clipboard_history.append(data)
+        return {"copied": data}
+
+    def _paste_from_clipboard(self) -> Dict:
+        return {"content": pyperclip.paste()}
+
+    def advanced_window_management(self, action: str, params: Optional[Dict] = None) -> Dict[str, Any]:
+        """Advanced window management features"""
+        try:
+            actions = {
+                "tile_windows": self._tile_all_windows,
+                "cascade_windows": self._cascade_windows,
+                "center_window": self._center_current_window,
+                "split_screen": self._setup_split_screen,
+                "save_layout": self._save_window_layout,
+                "load_layout": self._load_window_layout
+            }
+
+            if action in actions:
+                return {"success": True, "result": actions[action](params)}
+            return {"success": False, "error": "Invalid window action"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _tile_all_windows(self, params: Optional[Dict] = None) -> str:
+        script = '''
+        tell application "System Events"
+            set screenSize to get size of window of desktop
+            set screenWidth to item 1 of screenSize
+            set screenHeight to item 2 of screenSize
+            
+            set windowList to every window of (every process whose visible is true)
+            set windowCount to count of windowList
+            
+            set cols to round up of (square root of windowCount)
+            set rows to round up of (windowCount / cols)
+            
+            set winWidth to screenWidth / cols
+            set winHeight to screenHeight / rows
+            
+            repeat with i from 1 to windowCount
+                set thisWindow to item i of windowList
+                set xPos to (((i - 1) mod cols) * winWidth)
+                set yPos to ((((i - 1) / cols) as integer) * winHeight)
+                
+                set position of thisWindow to {xPos, yPos}
+                set size of thisWindow to {winWidth, winHeight}
+            end repeat
+        end tell
+        '''
+        return self.execute_system_command(script)
+
+    def monitor_system_health(self) -> Dict[str, Any]:
+        """Monitor system health metrics"""
+        try:
+            return {
+                "cpu": self._get_cpu_stats(),
+                "memory": self._get_memory_stats(),
+                "disk": self._get_disk_stats(),
+                "temperature": self._get_temperature(),
+                "battery": self._get_battery_info(),
+                "network": self._get_network_stats()
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_cpu_stats(self) -> Dict:
+        return {
+            "percent": psutil.cpu_percent(interval=1, percpu=True),
+            "freq": psutil.cpu_freq(),
+            "count": psutil.cpu_count(),
+            "load": os.getloadavg()
+        }
+
+    def _get_memory_stats(self) -> Dict:
+        mem = psutil.virtual_memory()
+        return {
+            "total": mem.total,
+            "available": mem.available,
+            "percent": mem.percent,
+            "used": mem.used,
+            "free": mem.free
+        }
+
+    def power_management(self, action: str, params: Optional[Dict] = None) -> Dict[str, Any]:
+        """Power management features"""
+        try:
+            actions = {
+                "sleep": self._sleep_system,
+                "restart": self._restart_system,
+                "shutdown": self._shutdown_system,
+                "energy_profile": self._set_energy_profile,
+                "battery_info": self._get_battery_info,
+                "display_sleep": self._set_display_sleep
+            }
+
+            if action in actions:
+                return {"success": True, "result": actions[action](params)}
+            return {"success": False, "error": "Invalid power action"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _set_energy_profile(self, params: Dict) -> str:
+        profile = params.get("profile", "normal")
+        profiles = {
+            "power_saver": "-1",
+            "normal": "0",
+            "performance": "1"
+        }
+        if profile in profiles:
+            script = f'sudo pmset -a powermode {profiles[profile]}'
+            return self.execute_system_command(script)
+        return "Invalid power profile"
+
+    def _set_display_sleep(self, params: Dict) -> str:
+        timeout = params.get("timeout", 15)  # minutes
+        script = f'sudo pmset displaysleep {timeout}'
+        return self.execute_system_command(script)
+
+    async def backup_system(self, params: Dict) -> Dict[str, Any]:
+        """Perform system backup operations"""
+        try:
+            backup_type = params.get("type", "timemachine")
+            if backup_type == "timemachine":
+                return await self._start_time_machine_backup()
+            elif backup_type == "custom":
+                return await self._custom_backup(params)
+            return {"success": False, "error": "Invalid backup type"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def _start_time_machine_backup(self) -> Dict[str, Any]:
+        cmd = 'tmutil startbackup'
+        result = await self._run_command(cmd)
+        return {"success": True, "result": result}
+
+    async def _custom_backup(self, params: Dict) -> Dict[str, Any]:
+        source = params.get("source", "~/Documents")
+        destination = params.get("destination", "~/Backups")
+        exclude = params.get("exclude", [])
+        
+        try:
+            source = os.path.expanduser(source)
+            destination = os.path.expanduser(destination)
+            
+            if not os.path.exists(destination):
+                os.makedirs(destination)
+                
+            backup_name = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            backup_path = os.path.join(destination, backup_name)
+            
+            shutil.copytree(source, backup_path, ignore=shutil.ignore_patterns(*exclude))
+            
+            return {
+                "success": True,
+                "backup_path": backup_path,
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
 class MacUtils:
     @staticmethod
